@@ -11,11 +11,15 @@ PING_TARGET = "<@&1489251181451808922>"
 
 def fetch_japan_data():
     url = "https://yata.yt/api/v1/travel/export/"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         return response.json()
-    except:
+    except Exception as e:
+        print(f"Lỗi truy xuất API YATA: {e}")
         return None
 
 def send_discord_ping(quantity, cost):
@@ -23,7 +27,9 @@ def send_discord_ping(quantity, cost):
         "content": f"{PING_TARGET} **RESTOCK ALARM**\nXanax has restocked!\nQuantity: {quantity}\nPrice: ${cost:,}"
     }
     try:
-        requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        response.raise_for_status()
+        print(f"Ping thành công. HTTP Status: {response.status_code}")
     except Exception as e:
         print(f"Lỗi gửi Webhook: {e}")
 
@@ -42,21 +48,19 @@ def run_live_tracker():
                 if current_update != last_update:
                     last_update = current_update
                     
-                    for item in jap_stocks:
-                        if item.get("id") == TARGET_ITEM_ID:
-                            quantity = item.get("quantity", 0)
-                            cost = item.get("cost", 0)
-                            
-                            if quantity > 0:
-                                if not was_in_stock:
-                                    print(f"Phát hiện restock: {quantity} items. Đang ping Discord...")
-                                    send_discord_ping(quantity, cost)
-                                    was_in_stock = True
-                            else:
-                                was_in_stock = False
-                            break
-            except KeyError:
-                pass
+                    target_item = next((item for item in jap_stocks if item.get("id") == TARGET_ITEM_ID), None)
+                    quantity = target_item.get("quantity", 0) if target_item else 0
+                    cost = target_item.get("cost", 0) if target_item else 0
+                    
+                    if quantity > 0:
+                        if not was_in_stock:
+                            print(f"Phát hiện restock: {quantity} items. Đang ping Discord...")
+                            send_discord_ping(quantity, cost)
+                            was_in_stock = True
+                    else:
+                        was_in_stock = False
+            except KeyError as e:
+                print(f"Lỗi cấu trúc JSON từ YATA: Thiếu khóa {e}")
         time.sleep(POLL_INTERVAL)
 
 class DummyHandler(BaseHTTPRequestHandler):
@@ -65,6 +69,10 @@ class DummyHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/plain')
         self.end_headers()
         self.wfile.write(b"Tracker is active.")
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
 
 def run_dummy_server():
     port = int(os.environ.get('PORT', 8080))
