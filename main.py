@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 TARGET_ITEM_ID = 206
 POLL_INTERVAL = 70
-WEBHOOK_URL = "https://discord.com/api/webhooks/1489863463114113074/KaMdOwn5rBBiVJb9fIH4aFrOnNZ4FFh4I8EfdsN5R8F9qBzLk-iGburOsO93sgV_CuqI"
+WEBHOOK_URL = "https://discord.com/api/webhooks/1489957213626962050/kqmc7LedtFdoTowqyL7osHeaXqI2zCgUfoZWS-xDAvSxXSY2vX1ncBMqjsiUT02sSSRL"
 PING_TARGET = "<@&1489251181451808922>" 
 
 def fetch_data():
