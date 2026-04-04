@@ -24,10 +24,19 @@ def fetch_data():
 
 def send_discord_ping(quantity, cost):
     payload = {
-        "content": f"{PING_TARGET} **RESTOCK ALARM**\nXanax has restocked in Japan!\nQuantity: {quantity}\nPrice: ${cost:,}"
+        "content": f"{PING_TARGET} **RESTOCK ALARM**\nItem has restocked!\nQuantity: {quantity}\nPrice: ${cost:,}"
     }
     try:
         response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        if response.status_code == 429:
+            try:
+                error_data = response.json()
+                retry_after = error_data.get('retry_after', 10)
+                print(f"[LOG] Bị Discord chặn IP tạm thời. Cần chờ {retry_after} giây để mở khóa.", flush=True)
+            except:
+                print("[LOG] Lỗi 429 từ Discord. Không thể phân tách JSON thời gian chờ.", flush=True)
+            return
+            
         response.raise_for_status()
         print(f"[LOG] Ping thành công. HTTP Status: {response.status_code}", flush=True)
     except Exception as e:
