@@ -39,28 +39,36 @@ def run_live_tracker():
 
     while True:
         payload = fetch_japan_data()
-        if payload:
+        if payload is None:
+            print("[LOG] Truy xuất thất bại. Payload rỗng. Khả năng cao do chặn IP hoặc lỗi mạng.")
+        else:
             try:
                 jap_data = payload["stocks"]["jap"]
                 jap_stocks = jap_data["stocks"]
                 current_update = jap_data.get("update", 0)
 
+                print(f"[LOG] Kết nối API thành công. Update ID: {current_update} | Last ID: {last_update}")
+
                 if current_update != last_update:
                     last_update = current_update
                     
                     target_item = next((item for item in jap_stocks if item.get("id") == TARGET_ITEM_ID), None)
-                    quantity = target_item.get("quantity", 0) if target_item else 0
-                    cost = target_item.get("cost", 0) if target_item else 0
                     
-                    if quantity > 0:
-                        if not was_in_stock:
-                            print(f"Phát hiện restock: {quantity} items. Đang ping Discord...")
-                            send_discord_ping(quantity, cost)
-                            was_in_stock = True
+                    if target_item is None:
+                        print(f"[LOG] Cảnh báo: Vật phẩm ID {TARGET_ITEM_ID} không có mặt trong chuỗi dữ liệu YATA trả về.")
                     else:
-                        was_in_stock = False
+                        quantity = target_item.get("quantity", 0)
+                        cost = target_item.get("cost", 0)
+                        print(f"[LOG] Quét thành công ID {TARGET_ITEM_ID}. Số lượng kho hiện hành: {quantity}")
+                        
+                        if quantity > 0:
+                            if not was_in_stock:
+                                send_discord_ping(quantity, cost)
+                                was_in_stock = True
+                        else:
+                            was_in_stock = False
             except KeyError as e:
-                print(f"Lỗi cấu trúc JSON từ YATA: Thiếu khóa {e}")
+                print(f"[LOG] Lỗi phân tách JSON. Cấu trúc bị sai lệch tại khóa: {e}")
         time.sleep(POLL_INTERVAL)
 
 class DummyHandler(BaseHTTPRequestHandler):
