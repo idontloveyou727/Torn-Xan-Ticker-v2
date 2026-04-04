@@ -9,7 +9,7 @@ POLL_INTERVAL = 70
 WEBHOOK_URL = "https://discord.com/api/webhooks/1489863463114113074/KaMdOwn5rBBiVJb9fIH4aFrOnNZ4FFh4I8EfdsN5R8F9qBzLk-iGburOsO93sgV_CuqI"
 PING_TARGET = "<@&1489251181451808922>" 
 
-def fetch_japan_data():
+def fetch_data():
     url = "https://yata.yt/api/v1/travel/export/"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -19,7 +19,7 @@ def fetch_japan_data():
         response.raise_for_status()
         return response.json()
     except Exception as e:
-        print(f"[LOG] Lỗi truy xuất API YATA: {e}")
+        print(f"[LOG] Lỗi truy xuất API YATA: {e}", flush=True)
         return None
 
 def send_discord_ping(quantity, cost):
@@ -29,37 +29,38 @@ def send_discord_ping(quantity, cost):
     try:
         response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
         response.raise_for_status()
-        print(f"[LOG] Ping thành công. HTTP Status: {response.status_code}")
+        print(f"[LOG] Ping thành công. HTTP Status: {response.status_code}", flush=True)
     except Exception as e:
-        print(f"[LOG] Lỗi gửi Webhook: {e}")
+        print(f"[LOG] Lỗi gửi Webhook: {e}", flush=True)
 
 def run_live_tracker():
     last_update = 0
     was_in_stock = False
 
     while True:
-        payload = fetch_japan_data()
-        if payload is None:
-            print("[LOG] Truy xuất thất bại. Payload rỗng.")
-        else:
-            try:
-                jap_data = payload["stocks"]["jap"]
-                jap_stocks = jap_data["stocks"]
-                current_update = jap_data.get("update", 0)
+        try:
+            payload = fetch_data()
+            if not payload or not isinstance(payload, dict):
+                print(f"[LOG] Truy xuất thất bại hoặc sai định dạng. Payload: {payload}", flush=True)
+            else:
+                stocks_data = payload.get("stocks", {})
+                country_data = stocks_data.get("jap", {})
+                country_stocks = country_data.get("stocks", [])
+                current_update = country_data.get("update", 0)
 
-                print(f"[LOG] Kết nối API thành công. Update ID: {current_update} | Last ID: {last_update}")
+                print(f"[LOG] Quét API thành công. Update ID: {current_update} | Last ID: {last_update}", flush=True)
 
                 if current_update != last_update:
                     last_update = current_update
                     
-                    target_item = next((item for item in jap_stocks if item.get("id") == TARGET_ITEM_ID), None)
+                    target_item = next((item for item in country_stocks if isinstance(item, dict) and item.get("id") == TARGET_ITEM_ID), None)
                     
                     if target_item is None:
-                        print(f"[LOG] Cảnh báo: Vật phẩm ID {TARGET_ITEM_ID} không tồn tại trong dữ liệu trả về.")
+                        print(f"[LOG] Cảnh báo: Vật phẩm ID {TARGET_ITEM_ID} không tồn tại trong kho hiện hành.", flush=True)
                     else:
                         quantity = target_item.get("quantity", 0)
                         cost = target_item.get("cost", 0)
-                        print(f"[LOG] Quét thành công ID {TARGET_ITEM_ID}. Số lượng: {quantity}")
+                        print(f"[LOG] Phát hiện ID {TARGET_ITEM_ID}. Số lượng kho: {quantity}", flush=True)
                         
                         if quantity > 0:
                             if not was_in_stock:
@@ -67,8 +68,9 @@ def run_live_tracker():
                                 was_in_stock = True
                         else:
                             was_in_stock = False
-            except KeyError as e:
-                print(f"[LOG] Lỗi phân tách JSON. Thiếu khóa: {e}")
+        except Exception as e:
+            print(f"[FATAL LOG] Hệ thống quét sập do ngoại lệ không lường trước: {e}", flush=True)
+        
         time.sleep(POLL_INTERVAL)
 
 class DummyHandler(BaseHTTPRequestHandler):
@@ -81,6 +83,8 @@ class DummyHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/plain')
         self.end_headers()
+    def log_message(self, format, *args):
+        return
 
 def run_dummy_server():
     port = int(os.environ.get('PORT', 8080))
