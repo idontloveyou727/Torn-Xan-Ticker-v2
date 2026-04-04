@@ -4,7 +4,7 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-TARGET_ITEM_ID = 277
+TARGET_ITEM_ID = 206
 POLL_INTERVAL = 70
 WEBHOOK_URL = "https://discord.com/api/webhooks/1489863463114113074/KaMdOwn5rBBiVJb9fIH4aFrOnNZ4FFh4I8EfdsN5R8F9qBzLk-iGburOsO93sgV_CuqI"
 PING_TARGET = "<@&1489251181451808922>" 
@@ -24,7 +24,7 @@ def fetch_data():
 
 def send_discord_ping(quantity, cost):
     payload = {
-        "content": f"{PING_TARGET} **RESTOCK ALARM**\nCherry Blossom has restocked!\nQuantity: {quantity}\nPrice: ${cost:,}"
+        "content": f"{PING_TARGET} **RESTOCK ALARM**\nXanax has restocked in Japan!\nQuantity: {quantity}\nPrice: ${cost:,}"
     }
     try:
         response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
