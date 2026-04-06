@@ -3,6 +3,7 @@ import time
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from datetime import datetime, timedelta
 
 TARGET_ITEM_ID = 206
 POLL_INTERVAL = 70
@@ -23,9 +24,39 @@ def fetch_data():
         return None
 
 def send_discord_ping(quantity, cost):
-    payload = {
-        "content": f"{PING_TARGET} **RESTOCK ALARM**\nItem has restocked!\nQuantity: {quantity}\nPrice: ${cost:,}"
-    }
+    now_tct = datetime.utcnow()
+    now_ts = int(time.time())
+    
+    # Tính toán TCT (Để hiển thị tham chiếu gốc)
+    restock_1_tct = now_tct + timedelta(minutes=130)
+    restock_2_tct = now_tct + timedelta(minutes=260)
+
+    # Tính toán Unix Timestamp (Để Discord tự động render Local Time)
+    restock_1_ts = now_ts + (130 * 60)
+    restock_2_ts = now_ts + (260 * 60)
+    
+    airstrip_depart_ts = restock_2_ts - (158 * 60)
+    wlt_depart_ts = restock_1_ts - (113 * 60)
+    bct_depart_ts = restock_1_ts - (68 * 60)
+
+    time_format = "%H:%M"
+
+    content_str = (
+        f"{PING_TARGET} **RESTOCK ALARM**\n"
+        f"Xanax has restocked!\n"
+        f"Quantity: {quantity}\n"
+        f"Price: ${cost:,}\n\n"
+        f"**Estimated Restock time:**\n"
+        f"- Batch 1: {restock_1_tct.strftime(time_format)} TCT | Local: <t:{restock_1_ts}:t>\n"
+        f"- Batch 2: {restock_2_tct.strftime(time_format)} TCT | Local: <t:{restock_2_ts}:t>\n\n"
+        f"**Suggested Flight Schedule to Japan:**\n"
+        f"**[Recommended] Air Strip (ETA <t:{restock_2_ts}:t>): Departure at <t:{airstrip_depart_ts}:t>**\n"
+        f"*Private Jet (WLT) (ETA <t:{restock_1_ts}:t>): Departure at <t:{wlt_depart_ts}:t>*\n"
+        f"*Business Class (BCT) (ETA <t:{restock_1_ts}:t>): Departure at <t:{bct_depart_ts}:t>*"
+    )
+
+    payload = {"content": content_str}
+
     try:
         response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
         if response.status_code == 429:
@@ -66,6 +97,7 @@ def run_live_tracker():
                     
                     if target_item is None:
                         print(f"[LOG] Cảnh báo: Vật phẩm ID {TARGET_ITEM_ID} không tồn tại trong kho hiện hành.", flush=True)
+                        was_in_stock = False
                     else:
                         quantity = target_item.get("quantity", 0)
                         cost = target_item.get("cost", 0)
