@@ -5,7 +5,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime, timedelta
 
-TARGET_ITEM_ID = 277
+TARGET_ITEM_ID = 206
 POLL_INTERVAL = 70
 WEBHOOK_URL = "https://discord.com/api/webhooks/1489957213626962050/kqmc7LedtFdoTowqyL7osHeaXqI2zCgUfoZWS-xDAvSxXSY2vX1ncBMqjsiUT02sSSRL"
 PING_TARGET = "<@&1489251181451808922>" 
