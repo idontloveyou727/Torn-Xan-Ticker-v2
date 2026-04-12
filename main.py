@@ -29,7 +29,7 @@ def fetch_data():
 
 def execute_departure_ping(role_id, flight_name, depart_ts):
     payload = {
-        "content": f"<@&{role_id}> **DEPARTURE ALERT**\nChuẩn bị khởi hành chuyến {flight_name}. Lịch bay: <t:{depart_ts}:t> (1 phút nữa)."
+        "content": f"<@&{role_id}> **DEPARTURE ALERT**\nReady to depart {flight_name}. Flight schedule: <t:{depart_ts}:t> (1 minute later)."
     }
     try:
         requests.post(WEBHOOK_URL, json=payload, timeout=10)
