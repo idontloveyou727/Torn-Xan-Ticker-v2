@@ -5,10 +5,14 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime, timedelta
 
-TARGET_ITEM_ID = 206
+TARGET_ITEM_ID = 277
 POLL_INTERVAL = 70
 WEBHOOK_URL = "https://discord.com/api/webhooks/1489957213626962050/kqmc7LedtFdoTowqyL7osHeaXqI2zCgUfoZWS-xDAvSxXSY2vX1ncBMqjsiUT02sSSRL"
 PING_TARGET = "<@&1489251181451808922>" 
+
+ROLE_BCT = "1492811872167264407"
+ROLE_AIRSTRIP = "1492811953670979594"
+ROLE_WLT = "1492811988588298333"
 
 def fetch_data():
     url = "https://yata.yt/api/v1/travel/export/"
@@ -23,15 +27,25 @@ def fetch_data():
         print(f"[LOG] Lỗi truy xuất API YATA: {e}", flush=True)
         return None
 
+def execute_departure_ping(role_id, flight_name, depart_ts):
+    payload = {
+        "content": f"<@&{role_id}> **DEPARTURE ALERT**\nChuẩn bị khởi hành chuyến {flight_name}. Lịch bay: <t:{depart_ts}:t> (1 phút nữa)."
+    }
+    try:
+        requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        print(f"[LOG] Thực thi delayed ping cho role {role_id} thành công.", flush=True)
+    except Exception as e:
+        print(f"[LOG] Lỗi gửi delayed Webhook ({flight_name}): {e}", flush=True)
+
 def send_discord_ping(quantity, cost):
     now_tct = datetime.utcnow()
     now_ts = int(time.time())
     
-    # Tính toán TCT (Để hiển thị tham chiếu gốc)
+    # Tính toán TCT
     restock_1_tct = now_tct + timedelta(minutes=130)
     restock_2_tct = now_tct + timedelta(minutes=260)
 
-    # Tính toán Unix Timestamp (Để Discord tự động render Local Time)
+    # Tính toán Unix Timestamp
     restock_1_ts = now_ts + (130 * 60)
     restock_2_ts = now_ts + (260 * 60)
     
@@ -70,6 +84,19 @@ def send_discord_ping(quantity, cost):
             
         response.raise_for_status()
         print(f"[LOG] Ping thành công. HTTP Status: {response.status_code}", flush=True)
+
+        # Lên lịch gửi webhook tương lai (Thời gian chờ = TS khởi hành - TS hiện tại - 60 giây)
+        wlt_delay = wlt_depart_ts - now_ts - 60
+        bct_delay = bct_depart_ts - now_ts - 60
+        airstrip_delay = airstrip_depart_ts - now_ts - 60
+
+        if wlt_delay > 0:
+            threading.Timer(wlt_delay, execute_departure_ping, args=(ROLE_WLT, "Private Jet (WLT)", wlt_depart_ts)).start()
+        if bct_delay > 0:
+            threading.Timer(bct_delay, execute_departure_ping, args=(ROLE_BCT, "Business Class (BCT)", bct_depart_ts)).start()
+        if airstrip_delay > 0:
+            threading.Timer(airstrip_delay, execute_departure_ping, args=(ROLE_AIRSTRIP, "Air Strip", airstrip_depart_ts)).start()
+
     except Exception as e:
         print(f"[LOG] Lỗi gửi Webhook: {e}", flush=True)
 
