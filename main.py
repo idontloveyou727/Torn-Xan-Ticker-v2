@@ -29,7 +29,7 @@ def fetch_data():
 
 def execute_departure_ping(role_id, flight_name, depart_ts):
     payload = {
-        "content": f"<@&{role_id}> **DEPARTURE ALERT**\nReady to depart {flight_name}. Flight schedule: <t:{depart_ts}:t> (1 minute later)."
+        "content": f"<@&{role_id}> **DEPARTURE ALERT**\nReady to depart {flight_name}. Time: <t:{depart_ts}:t> (1 minute later)."
     }
     try:
         requests.post(WEBHOOK_URL, json=payload, timeout=10)
@@ -38,21 +38,31 @@ def execute_departure_ping(role_id, flight_name, depart_ts):
         print(f"[LOG] Lỗi gửi delayed Webhook ({flight_name}): {e}", flush=True)
 
 def send_discord_ping(quantity, cost):
-    now_tct = datetime.utcnow()
     now_ts = int(time.time())
+    now_utc = datetime.utcnow()
     
-    # Tính toán TCT
-    restock_1_tct = now_tct + timedelta(minutes=130)
-    restock_2_tct = now_tct + timedelta(minutes=260)
-
-    # Tính toán Unix Timestamp
-    restock_1_ts = now_ts + (130 * 60)
-    restock_2_ts = now_ts + (260 * 60)
+    # 1. Chuyển đổi Realtime về True Restock Time (Làm tròn lùi về 00, 15, 30, 45)
+    true_restock_utc = now_utc.replace(minute=(now_utc.minute // 15) * 15, second=0, microsecond=0)
+    diff_seconds = (now_utc - true_restock_utc).total_seconds()
+    true_restock_ts = int(now_ts - diff_seconds)
     
-    airstrip_depart_ts = restock_2_ts - (158 * 60)
-    wlt_depart_ts = restock_1_ts - (113 * 60)
-    bct_depart_ts = restock_1_ts - (68 * 60)
+    # 2. Dự đoán Batch Restock (9 Ticks = 135 phút)
+    TICK_MINUTES = 135
+    restock_1_ts = true_restock_ts + (TICK_MINUTES * 60)
+    restock_2_ts = restock_1_ts + (TICK_MINUTES * 60)
 
+    # 3. Mục tiêu Landing = Restock Time + 2 phút
+    landing_1_ts = restock_1_ts + 120
+    landing_2_ts = restock_2_ts + 120
+    
+    # 4. Thời gian khởi hành = Landing Time - Flight Time
+    airstrip_depart_ts = landing_2_ts - (158 * 60)
+    wlt_depart_ts = landing_1_ts - (113 * 60)
+    bct_depart_ts = landing_1_ts - (68 * 60)
+
+    # Tính toán TCT để render chuỗi text cố định
+    restock_1_tct = true_restock_utc + timedelta(minutes=TICK_MINUTES)
+    restock_2_tct = restock_1_tct + timedelta(minutes=TICK_MINUTES)
     time_format = "%H:%M"
 
     content_str = (
@@ -63,10 +73,10 @@ def send_discord_ping(quantity, cost):
         f"**Estimated Restock time:**\n"
         f"- Batch 1: {restock_1_tct.strftime(time_format)} TCT | Local: <t:{restock_1_ts}:t>\n"
         f"- Batch 2: {restock_2_tct.strftime(time_format)} TCT | Local: <t:{restock_2_ts}:t>\n\n"
-        f"**Suggested Flight Schedule to Japan:**\n"
-        f"**[Recommended] Air Strip (ETA <t:{restock_2_ts}:t>): Departure at <t:{airstrip_depart_ts}:t>**\n"
-        f"*Private Jet (WLT) (ETA <t:{restock_1_ts}:t>): Departure at <t:{wlt_depart_ts}:t>*\n"
-        f"*Business Class (BCT) (ETA <t:{restock_1_ts}:t>): Departure at <t:{bct_depart_ts}:t>*"
+        f"**Suggested Flight Schedule (Landing at Restock Estimated time +2 mins):**\n"
+        f"**[Recommended] Air Strip (ETA <t:{landing_2_ts}:t>): Departure at <t:{airstrip_depart_ts}:t>**\n"
+        f"*Private Jet (WLT) (ETA <t:{landing_1_ts}:t>): Departure at <t:{wlt_depart_ts}:t>*\n"
+        f"*Business Class (BCT) (ETA <t:{landing_1_ts}:t>): Departure at <t:{bct_depart_ts}:t>*"
     )
 
     payload = {"content": content_str}
@@ -111,7 +121,7 @@ def run_live_tracker():
                 print(f"[LOG] Truy xuất thất bại hoặc sai định dạng. Payload: {payload}", flush=True)
             else:
                 stocks_data = payload.get("stocks", {})
-                country_data = stocks_data.get("jap", {})
+                country_data = stocks_data.get("jap", {}) 
                 country_stocks = country_data.get("stocks", [])
                 current_update = country_data.get("update", 0)
 
